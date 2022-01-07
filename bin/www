@@ -1,0 +1,1277 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+ var app = require('../app');
+ var debug = require('debug')('mix:server');
+ var http = require('http');
+ 
+ /**
+  * Get port from environment and store in Express.
+  */
+ 
+ var port = normalizePort(process.env.PORT || '8888');
+ app.set('port', port);
+ 
+ /**
+  * Create HTTP server.
+  */
+ 
+ var server = http.createServer(app);
+ 
+ //const server = require('http').Server(app);
+
+ 
+ /**
+  * Listen on provided port, on all network interfaces.
+  */
+ 
+ server.listen(port);
+ server.on('error', onError);
+ server.on('listening', onListening);
+ 
+ /**
+  * Normalize a port into a number, string, or false.
+  */
+ 
+ function normalizePort(val) {
+   var port = parseInt(val, 10);
+ 
+   if (isNaN(port)) {
+     // named pipe
+     return val;
+   }
+ 
+   if (port >= 0) {
+     // port number
+     return port;
+   }
+ 
+   return false;
+ }
+ 
+ /**
+  * Event listener for HTTP server "error" event.
+  */
+ 
+ function onError(error) {
+   if (error.syscall !== 'listen') {
+     throw error;
+   }
+ 
+   var bind = typeof port === 'string'
+     ? 'Pipe ' + port
+     : 'Port ' + port;
+ 
+   // handle specific listen errors with friendly messages
+   switch (error.code) {
+     case 'EACCES':
+       console.error(bind + ' requires elevated privileges');
+       process.exit(1);
+       break;
+     case 'EADDRINUSE':
+       console.error(bind + ' is already in use');
+       process.exit(1);
+       break;
+     default:
+       throw error;
+   }
+ }
+ 
+ /**
+  * Event listener for HTTP server "listening" event.
+  */
+ 
+ function onListening() {
+   var addr = server.address();
+   var bind = typeof addr === 'string'
+     ? 'pipe ' + addr
+     : 'port ' + addr.port;
+   debug('Listening on ' + bind);
+ }
+ 
+ //-----------------------------------------------------------
+ const MongoClient = require('mongodb').MongoClient;
+ const bcrypt = require('bcrypt');
+ const fs = require('fs');
+ const io = require('socket.io')(server, {
+  cors: {
+    origin: '*',
+  }
+});
+
+ //function process images
+var images = require('../public/javascripts/server/images.js');
+ //function process db
+var dbAccess = require('../public/javascripts/server/dbAccess.js');
+const { Console } = require('console');
+
+ //global values
+ //mongodb host
+ var baseUrl = 'mongodb://localhost:27017/';
+ //db of all user
+ var dbAllUser = 'dbAllUser';
+//prefix db name of usef
+const dbUser =  "dbUser_";
+
+var jwToken = require('../public/javascripts/server/jwToken.js');
+//modul process mssql
+var mssql = require("mssql");
+// config for your mssql database
+var config = {
+  user: 'sa',
+  password: 'VdcVNH2020@$#',
+  server: 'WIN-VNN\\SQLEXPRESS', 
+  database: 'web_vnn',
+  stream: false,
+  options: {
+    trustedConnection: true,
+    encrypt: false,
+    enableArithAbort: true,
+    trustServerCertificate: true,
+  }, 
+};
+
+ //array off socket.id off user still online
+ var listUserSocketId = [];
+ //local path of picture 
+var local = __dirname + "/../public/images/upload/";
+//total number of romm of server
+var roomsCounter = 1;//dbAccess.getRoomsCounter();
+
+ 
+ //function return socket.id of username
+ function findSocketId(username){
+   var tempObject = listUserSocketId.find(obj => obj.name == username);
+   return tempObject?.socketId;
+ }
+ //function delete username and socket.id from listUserSocketId
+ function deleteSockId(username){
+   var index = -1;
+   for (var i = 0; i<listUserSocketId.length ; i++){
+     var temp = listUserSocketId[i];
+     if (temp.name == username){
+         index = i;
+     }
+   }
+   if (index > -1) {
+     //delete key of user disconnect
+     listUserSocketId.splice(index,1);
+   } else {
+     //do nothing
+   }
+ }
+
+ io.on('connection', function(client) {
+   console.log("Client connecting...");
+   //list of temp image
+   var imgList = [];
+   //list of chatter
+   var myChatList = [];
+   var myAlertList = [];
+   var myRoomsList = [];
+   const onlineStatus =2;
+   const offlineStatus = 1;
+   const invalidResult = 'ko';
+   const validResult = 'ok';
+   const exitsFriend = 'exits';
+   const loginInvalidUsername = '0';
+   const loginInvalidPassword = '1';
+   const maxUsernameLength = 20;
+
+    //function return socket.id of username
+  function getRoomInfo(roomID){    
+    for (var i = 0; i<myRoomsList.length ; i++){
+      var temp = myRoomsList[i].slice();
+      if (temp[0] == roomID){
+          return temp;
+      }
+    }
+  }
+  //check a friend has exits or not
+   function checkFindOutUser(username){     
+     var currentRlsStatus = dbAccess.getRlsStatus(client.username, username);
+     
+     currentRlsStatus.then(function(rlsStatus){
+       var findUserResult = [];
+       findUserResult.push(rlsStatus);
+       findUserResult.push(username);
+      client.emit('findUserResult', findUserResult);
+      
+     });
+      
+   }
+
+  //function alert friend about my status
+  function alertFriendMyStatus(myStatus){     
+  if(myChatList.length){      
+    //look up all list
+    for(var i = 0; i < myChatList.length; i++){
+      var tempChatter = myChatList[i].slice();
+      //find user still online and # chatbot
+      if(tempChatter[2] == dbAccess.rlsFriend && tempChatter[1] == onlineStatus){
+        var userSocketId = findSocketId(tempChatter[0]);
+        var myInfo = [];
+        myInfo.push(client.username);
+        myInfo.push(myStatus);
+        io.to(userSocketId).emit("friendStatusResult", myInfo);
+        
+      }
+    }
+  }
+}
+   //get event find an user
+   client.on('findUserMssql', function(username){  
+    //catch err database
+    if (username){ 
+      var usname = username;
+    //check username exit
+      // connect to your database
+      mssql.connect(config, function (err) {      
+        if (err) console.log(err);
+        // create Request object
+        var request = new mssql.Request();
+          
+        // query to the database and get the records
+        const usnameQuery = 'select * from Users where Username = \'' + usname + '\'';      
+        
+        request.query(usnameQuery, function (err, dataResult) {              
+            if (err){
+              throw err;
+            }
+            else{
+              if(dataResult.rowsAffected == 0){  //can't find the username            
+                //result verification to client
+                client.emit('findUserResult', invalidResult);
+              }
+              else{ //find out
+                checkFindOutUser(usname); 
+              }
+            }
+        });
+      });
+    }
+      
+  });
+
+//get event find an user
+    client.on('findUser', function(username){  
+      //catch err database
+      if (username){ 
+        var usname = username;
+        //check userfindUserResultname exit
+        MongoClient.connect(baseUrl,{ useNewUrlParser: true }, {useUnifiedTopology: true},  function(err, db){
+          if (err) {
+              throw err;
+          } 
+          else {
+              var dbo = db.db(dbAllUser);
+              dbo.collection('users').findOne({username: usname}, function(err, user){
+                  if (err) {
+                      throw err;
+                  } 
+                  else {
+                      if (user == null) {  //can't find the username            
+                        //result verification to client
+                        client.emit('findUserResult', invalidResult);
+                      } else {//find out
+                        
+                        checkFindOutUser(user.username);
+                      }
+                  }              
+              });
+            }
+            db.close();
+        });
+      }
+        
+    });
+
+    function addToListsSocketId(){
+      
+      //add key to find socketId by username
+      var key = new Object();
+      key.name = client.username;
+      key.socketId = client.id;
+      listUserSocketId.push(key);
+      
+    }
+
+    function getChatList(){
+      const username = client.username;
+      MongoClient.connect(baseUrl, { useNewUrlParser: true }, {useUnifiedTopology: true}, function(err, db){
+          if (err) {
+              throw err;
+          } 
+          else {
+            const dbName = dbAccess.dbUser + username;
+            const collectionName = "chatList";
+            var dbo = db.db(dbName);              
+            dbo.collection(collectionName).find({}).sort({"lastChat":-1}).toArray( function(err, data){
+                if (err) {
+                    throw err;
+                } else {
+                  if(data.length <=0){                    
+                    //create user default database                    
+                    images.createAvatarDefault(username);
+                    dbAccess.createdDefaultUserDB(username);
+                  }else{                    
+                  //clear myChatList
+                  myChatList.splice(0, myChatList.length);
+                  //clear myRoomsList
+                  myRoomsList.splice(0, myRoomsList.length);
+
+                  data.forEach(function(aChatter){      
+                    //setup myChatList
+                    var tempChatter = [];
+                    tempChatter.push(aChatter.name);
+                    //if socketid of friend exit, friend is online
+                    const chatterSocketId = findSocketId(aChatter.name);
+                    if(chatterSocketId){
+                      //online status = 2
+                      tempChatter.push(onlineStatus);
+                    } else{//offline status = 1
+                      tempChatter.push(offlineStatus);
+                    }
+                    //add status of relationship 
+                    tempChatter.push(aChatter.currentRlsStatus);
+                    //add friend info to chat lists
+                    myChatList.push(tempChatter);   
+                    
+                    //setup my rooms list
+                    if(aChatter.name){
+                      if(aChatter.name.length > 20){
+                        //join this room
+                        client.join(aChatter.name);//roomID
+                        //console.log(client.username + " joined room " + aChatter.name);
+
+                        //setup myRoomsList
+                        var tempRoom = [];
+                        tempRoom.push(aChatter.name);
+                        tempRoom.push(aChatter.roomName);
+                        tempRoom.push(aChatter.members);
+
+                        myRoomsList.push(tempRoom);
+                      }        
+                    }         
+                  });    
+                }
+                
+                //return chat list to client
+                client.emit('getChatListResult', myChatList);
+                client.emit('getRoomsListResult', myRoomsList);
+                //alert friend you are online
+                alertFriendMyStatus(onlineStatus);
+              }                
+            });
+            db.close();
+          }
+      });
+    }
+
+    function makeAlertToFriend(action, friendName){      
+      action.then(function(idResult){             
+        //write alert to alert lists
+        dbAccess.addNewAlert(friendName, client.username, dbAccess.actAddFriend, idResult);
+
+      });
+      
+      //alert if 'victim' online      
+      var userSocketId = findSocketId(friendName);
+      if(userSocketId){
+          io.to(userSocketId).emit('addFriendRequestAlert', client.username);        
+      }      
+    }
+
+    function pocessRelastionshipRequest(friendName){
+      //add new friend to my chat list or modify relStatus if this one exits
+      var exitsUser = dbAccess.checkExitsUser(client.username, friendName);
+      exitsUser.then(function(result){
+        if (result === dbAccess.userNotExits){
+          dbAccess.addNewFriendToChatList(client.username,friendName, dbAccess.rlsAddFriendRequest);
+        }else{
+          dbAccess.changeRlsStatus(client.username, friendName, dbAccess.rlsAddFriendRequest);
+        }
+      });
+      
+      //add me to friend chat list or modify relStatus if I exits
+      var exitsMe = dbAccess.checkExitsUser(friendName, client.username);
+      exitsMe.then(function(result){
+        if (result === dbAccess.userNotExits){
+          //add new friend to her/him chat list and return id 
+          var promiseResult = dbAccess.addNewFriendToChatList(friendName, client.username, dbAccess.rlsAddFriendRecive);
+          makeAlertToFriend(promiseResult, friendName);
+        }else {
+          var promiseResult = dbAccess.changeRlsStatus(client.username, friendName, dbAccess.rlsAddFriendRequest);
+          makeAlertToFriend(promiseResult, friendName);
+        }
+      });
+    }
+
+
+    //get event add friend. 
+    client.on('addFriend', function(friendName){
+      if(friendName){
+        pocessRelastionshipRequest(friendName);
+        client.emit('addFriendResult', validResult);
+        
+        
+      }else{
+        //alert err
+        client.emit('addFriendResult', invalidResult);
+      }
+
+    });
+
+    client.on('getChatList', function(info){
+      if(info){
+        getChatList();
+      }
+    });
+
+    client.on('refreshData', function(info){
+      
+      if(info){
+        getChatList();
+      }
+    });
+   //get event registry
+   client.on('userRegistry', function(info){
+     var usn = info[0];
+     var psw = info[1];
+
+     //catch err database
+     if (info[0]){ 
+      //check username exit
+      MongoClient.connect(baseUrl,{ useNewUrlParser: true }, {useUnifiedTopology: true},  function(err, db){
+        if (err) {
+            throw err;
+        } 
+        else {
+            var dbo = db.db(dbAllUser);
+            dbo.collection('users').findOne({username: usn}, function(err, user){
+                if (err) {
+                    throw err;
+                } 
+                else {
+                    if (user != null) {              
+                      //result verification to client
+                      client.emit('registryResult', invalidResult);
+                    } else {
+                      //hash password
+                      const saltRounds = 10;
+                      bcrypt.genSalt(saltRounds, function(err, salt){
+                          bcrypt.hash(psw, salt, function(err, hash){
+                            //add new user to dbAllUser
+                            var newUser = {
+                              username: usn,
+                              password: hash,
+                              created: dbAccess.dateTimeNow()
+                            };
+                            dbo.collection('users').insertOne(newUser, function(err, res) {
+                              if (err){ 
+                                throw err;
+                              }
+                              else{
+                                  //result verification to client
+                                  client.emit('registryResult', validResult);
+                                  db.close();
+                                  //create user default database
+                                  
+                                  images.createAvatarDefault(usn);
+                                  dbAccess.createdDefaultUserDB(usn);
+                              }
+                            });                          
+                                      
+                          });
+                      });
+                      
+                    }
+                }       
+            });
+        }
+      });
+
+     }
+     
+   });
+
+   //get login by jsonwebtoken
+   client.on('userLoginJwt', function(token){
+     if(token){
+       var decodedToken = jwToken.decodeToken(token);
+       const username = decodedToken?.username;
+       var tokenLifeTime =  decodedToken?.exp;
+       
+       var timeByms = new Date().getTime() ;
+       console.log(tokenLifeTime*1000 - timeByms);
+       
+       if(tokenLifeTime*1000 - timeByms> 0){
+          client.emit('loginResult', validResult);  
+          
+          //set global values
+          client.username = username;
+          
+          //add key to find socketId by username
+          addToListsSocketId();
+          //get my chat list
+          getChatList();
+        }else{
+          client.emit('userLoginJwtResult',invalidResult);
+        }
+      }
+   });
+   //get login to mssql event
+   client.on('userLoginMssql', function(info){    
+    var username = info[0];
+    var psw = info[1];
+
+    if(info){      
+      // connect to your database
+      mssql.connect(config, function (err) {      
+        if (err) console.log(err);
+        // create Request object
+        var request = new mssql.Request();
+          
+        // query to the database and get the records
+        const usnameQuery = 'select * from Users where Username = \'' + username + '\'';      
+        
+        request.query(usnameQuery, function (err, dataResult) {              
+            if (err){
+              throw err;
+            }
+            else{
+              if(dataResult.rowsAffected == 0){
+                //result verification to client: invalid username
+                client.emit('loginResult', loginInvalidUsername);
+              }
+              else{  
+                var userID = dataResult.recordset[0].UserID
+                const pawordQuery = 'select * from BEN_Members where UserID = \'' + userID + '\'';   
+                request.query(pawordQuery, function (err, result) {              
+                  if (err){
+                    throw err;
+                  }
+                  else{
+                    if (result.recordset[0].PassWord == psw) {
+                      //result verification to client
+                      client.emit('loginResult', validResult);  
+                      client.emit('jwtResult', jwToken.encodeToken(username, 14400))      ;
+                      
+                      //set global values
+                      client.username = username;
+                      
+                      //add key to find socketId by username
+                      addToListsSocketId();
+                      //get my chat list
+                      getChatList();
+                    } else {
+                      //result verification to client: invalid password
+                      client.emit('loginResult', loginInvalidPassword);
+                    }
+                  }        
+                });
+              }
+            }
+        });
+      });
+    }  
+  });
+ 
+   //get login event
+   client.on('userLogin', function(info){    
+     const username = info[0];
+     var psw = info[1];
+
+     //catch err access db
+     if (info[0] != null){      
+        MongoClient.connect(baseUrl,{ useNewUrlParser: true }, {useUnifiedTopology: true}, function(err, db){
+            if (err) {
+                throw err;
+            } else {                       
+                var dbo = db.db(dbAllUser);
+                dbo.collection('users').findOne({username: username}, function(err, user){                  
+                    if (err) {
+                        throw err;
+                    } else {
+                        if (user == null) {                      
+                          //result verification to client: invalid username
+                          client.emit('loginResult', loginInvalidUsername);
+                        } else {
+                          var hash = user.password;
+                          bcrypt.compare(psw, hash, function(err, result) {
+                            if (result) {
+                              //result verification to client
+                              client.emit('loginResult', validResult);   
+                              client.emit('jwtResult', jwToken.encodeToken(username, 100));
+                              
+                              //set global values
+                              client.username = username;
+                              //loadChatList(username);
+                              addToListsSocketId();
+                              //get my chat list
+                              getChatList();
+                              getAlertList();
+                            } else {
+                              //result verification to client: invalid password
+                              client.emit('loginResult', loginInvalidPassword);
+                            }
+                         });
+                        }
+                        db.close();
+                    }
+                });      
+            } 
+        });
+    }
+     
+   });
+
+   client.on('updateAvatar', function(avatarNew){    
+     
+      var newAvatar = [];
+      newAvatar.push(images.creteFilename(avatarNew.base64));
+      newAvatar.push(images.getBase64Image(avatarNew.base64));
+      if(client.username){
+      
+        dbAccess.UpdateImgCollection(client.username, "avatar", newAvatar);
+        images.updateAvatar(client.username, avatarNew);
+        client.emit("updateAvatarResult",validResult);
+    }
+    
+  });
+
+  function processMessageFromDB(chatWith, mess){
+    var tempLine = [];
+    tempLine.push(mess.sender);
+    tempLine.push(mess.created);
+    //if image
+    if(mess.imgBase64){
+
+      var imgMess = mess.imgBase64.slice();
+      var imgName = [];
+
+      for(var i = 0; i < imgMess.length; i++){
+        var savedFilename = images.creteFilename(imgMess[i].base64);
+        var imgBase64 = images.getBase64Image(imgMess[i].base64);
+
+        var uri = local + savedFilename;  
+        imgName.push(savedFilename);
+        //write image to local
+        images.writeImage(uri, imgBase64);
+        imgList.push(uri);                                 
+      }
+
+      tempLine.push(imgName);
+      //tick image pic
+      tempLine.push(true);
+    }
+    //if text
+    else {   
+      tempLine.push(mess.textMess);
+      //tick text mess
+      tempLine.push(false);
+    }
+
+    //if(chatWith.length > maxUsernameLength){
+      tempLine.push(chatWith);
+    //}
+    return tempLine;
+  }
+
+   //get open chat box event
+   client.on('openChatBox', function(chatWithUser){
+    readDatabaseMessage(chatWithUser, 1);
+    });
+
+    //get event read more message
+    client.on("readMoreMess", function(data){
+      if(data){
+        var chatWithUser = data[0];
+        var messagePagesNumber = data[1];
+        readDatabaseMessage(chatWithUser, messagePagesNumber);
+      }
+    });
+
+
+  function readDatabaseMessage(chatWithUser, messagePagesNumber){    
+    //access db to get messages of this user
+    var messages = [];  
+    var dbName = dbUser + client.username;
+    var collectionName = chatWithUser;
+    //catch err access db
+    if (chatWithUser != null){ 
+       MongoClient.connect(baseUrl, { useNewUrlParser: true }, {useUnifiedTopology: true}, function(err, db){
+           if (err) {
+               throw err;
+           } 
+           else {
+               var dbo = db.db(dbName);              
+               dbo.collection(collectionName).find({}).limit(10*messagePagesNumber).sort({"created":-1}).toArray( function(err, data){
+                   if (err) {
+                       throw err;
+                   } else {
+                       data.forEach(function(mess){ 
+                         messages.push(processMessageFromDB(chatWithUser, mess));
+                       }); 
+                       //return messages to client
+                       if(messagePagesNumber == 1){           //open chat box                     
+                          
+                          client.emit('openChatBoxResult', messages);
+                       }else{//read more message
+                          
+                        client.emit('readMoreMessResult', messages);
+                       }
+                   }                
+               });
+               db.close();
+           }
+       });
+     }
+  }
+
+   function processMessageFromClient(msg){
+   
+    var userGetMess = msg[0];
+    var messType = msg[1];
+    
+    //if sender and giver are ok
+    if(dbAccess.checkAccsessDB(client.username, userGetMess)){
+      //get socketid of giver
+      var userSocketId = findSocketId(userGetMess);
+      
+      var messFeedback = [];
+      messFeedback.push(client.username);         //user send this message    
+      messFeedback.push(dbAccess.dateTimeNow());  //time message send
+      
+      //process message by type of it
+      switch (messType){
+        //image mess
+        case "1":
+          var messContent = msg[2].slice(); 
+          //save msg to db of sender
+          dbAccess.saveMessImageBase64Sender(client.username, userGetMess, messContent);  
+          //save msg to db of giver
+          dbAccess.saveMessImageBase64Giver(userGetMess, client.username, messContent);
+          
+          var imgName = [];
+          for(var i = 0; i < msg[2].length; i++){
+            
+            var savedFilename = images.creteFilename(messContent[i].base64);
+            var imgBase64 = images.getBase64Image(messContent[i].base64);
+            var uri = local + savedFilename;   
+            
+            imgName.push(savedFilename);
+            //write image to local
+            images.writeImage(uri, imgBase64);
+            imgList.push(uri);
+          } 
+          messFeedback.push(imgName) ;
+          messFeedback.push(true);
+        break;
+
+        //other mess
+        case "2":
+
+        break;
+        //text mess
+        default:
+          var messContent = msg[2];
+          //save msg to db of sender
+          dbAccess.saveMessTxtSender(client.username, userGetMess, messContent);  
+          //save msg to db of giver
+          dbAccess.saveMessTxtGiver(userGetMess, client.username, messContent);
+          
+          messFeedback.push(messContent); 
+          messFeedback.push(false); 
+
+      }
+
+      messFeedback.push(userGetMess);
+      //feedback to send
+      client.emit("message", messFeedback );
+      //alert to giver
+      io.to(userSocketId).emit('message', messFeedback);
+      
+    }
+   }
+
+   function processMessageFromClientRoom(msg){
+    var roomID = msg[0];
+    var messType = msg[1];
+    var room = getRoomInfo(roomID);
+    
+    var members = room[2].slice();    
+    
+    //if sender and giver are ok    
+    if(dbAccess.checkAccsessDB(client.username, roomID)){
+      
+      var messFeedback = [];
+      messFeedback.push(client.username);          
+      messFeedback.push(dbAccess.dateTimeNow());
+
+      switch (messType){
+        //image mess
+        case "1":
+          var messContent = msg[2].slice();           
+          for(var i = 0; i < members.length; i++){
+            //update chat time
+            dbAccess.updateChatList(members[i], roomID, dbAccess.updateOderChatList); 
+            //save msg to db of all member in room
+            dbAccess.saveMessImageBase64Room(members[i], roomID, messContent, client.username);    
+          }
+          
+          var imgName = [];
+          for(var i = 0; i < msg[2].length; i++){
+            
+            var savedFilename = images.creteFilename(messContent[i].base64);
+            var imgBase64 = images.getBase64Image(messContent[i].base64);
+            var uri = local + savedFilename;   
+            
+            imgName.push(savedFilename);
+            //write image to local
+            images.writeImage(uri, imgBase64);
+            imgList.push(uri);
+          } 
+          messFeedback.push(imgName) ;
+          //tick img message
+          messFeedback.push(true);  
+          
+        break;
+
+        //other mess
+        case "2":
+
+        break;
+        //text mess
+        default:
+          var messContent = msg[2];
+          for(var i = 0; i < members.length; i++){
+            //update chat time
+            dbAccess.updateChatList(members[i], roomID, dbAccess.updateOderChatList); 
+            //save msg to db of all member in room
+            dbAccess.saveMessTxtRoom(members[i], roomID, messContent, client.username); 
+          }
+
+          messFeedback.push(messContent);  
+          //tick text message
+          messFeedback.push(false);     
+      }     
+         
+      //insert roomID
+      messFeedback.push(roomID);
+
+      //send mess to all member in room
+      io.to(roomID).emit('message', messFeedback);
+      //------------------------------------------------------------
+      //console.log(io.sockets.adapter.rooms.get(roomID).size);
+
+    }
+   }
+
+   //recive mess event
+   client.on('message',function(msg){
+      
+    const chatter = msg[0];
+    if(chatter.length >= 2 && chatter.length <= maxUsernameLength){      
+      //add last chat time to chatList of sender
+      dbAccess.updateChatList(client.username, chatter, dbAccess.updateOderChatList );
+      //add last chat time to chatList of givae
+      dbAccess.updateChatList(chatter, client.username, dbAccess.updateOderChatList );
+      processMessageFromClient(msg);
+    }
+    else if (chatter.length > maxUsernameLength){
+      processMessageFromClientRoom(msg);       
+    }
+    
+   });    
+
+   client.on('deleteOneMe', function (mess){
+       //not for now sorry
+   });
+ 
+   client.on('deleteMessOf', function (user){
+     
+     //catch err access db
+     if (dbAccess.checkAccsessDB(client.username, user)){ 
+       if(user.length > maxUsernameLength){
+        removefromRoom(user, client.username);//roomID = user
+       }else {
+         
+        var dbName = dbUser + client.username;
+        var collectionName = user;
+        //dell this user from chatList
+        dbAccess.updateChatList(client.username,user, dbAccess.dellFromChatList);
+        //change relationship of deleted friend from rlsFriend to rlsStranger
+        dbAccess.changeRlsStatus(user ,client.username, dbAccess.rlsStranger);
+          MongoClient.connect(baseUrl, { useNewUrlParser: true }, function(err, db){
+            if (err) throw err;
+            var dbo = db.db(dbName);
+            dbo.collection(collectionName).drop(function(err, delOK) {
+              if (err) throw err;          
+                  if (delOK){
+                      console.log("Collection deleted");
+                      client.emit('deleteMess', validResult);
+
+                      dbo.createCollection(collectionName, function(err){
+                        if (err) {
+                          console.log(err);
+                        } else {
+                          db.close();                        
+                        }
+                      });
+                  }
+            });
+          });
+        }
+     }
+   });
+ 
+   //del img was created 
+   function delTempImg(){
+    for (var i = 0; i < imgList.length; i++){     
+       fs.unlink(imgList[i], function(err){
+           if (err) {
+               console.log(err);
+           } else {
+               
+           }
+       });   
+      } 
+  }
+
+  //-------------------room function--------------------------
+  function createroomID(){
+    roomsCounter++;
+    //dbAccess.setRoomsCounter(roomsCounter);
+    var roomID = "roomID_" + images.randomString(10) + "_";
+    var roomNumber = roomsCounter.toString();
+    //add zero to roomNumber
+    for(var i = 0; i< (6 - roomNumber.length); i++){
+      roomID += "0";
+    }
+    
+    return roomID + roomNumber;
+  }
+
+  function createRoom(roomID, roomInfo){
+    //create room in databe.
+    //some room in server create when some client.join('roomName')
+    
+    
+    var roomName = roomInfo[0];
+    if(roomName.length <= 0){
+      roomName = "Group chat";
+    }
+    var roomMembers = [];
+    roomMembers = roomInfo[1].slice();
+
+    //create data for all member of room
+    for(var i = 0 ; i<roomMembers.length; i++){      
+      const usname = roomMembers[i];
+      
+      MongoClient.connect(baseUrl,{ useNewUrlParser: true }, {useUnifiedTopology: true}, function(err, db){
+        if (err) {
+            throw err;
+        } else { 
+          const dbName = dbUser + usname;      
+          var dbo = db.db(dbName); 
+
+          //add room to chat list 
+          dbo.collection(dbAccess.chatListCollection).findOne({username: usname}, function(err, user){
+            if (err) {
+                throw err;
+            } 
+            else {
+              if (user == null) {  //can't find the username      
+                var newChater = {
+                    name: roomID,
+                    roomName: roomName,
+                    members: roomMembers,
+                    lastChat: dbAccess.dateTimeNow(),
+                    created: dbAccess.dateTimeNow()
+                };
+                dbo.collection(dbAccess.chatListCollection).insertOne(newChater, function(err, res) {
+                    if (err) throw err;
+                    else{
+                        console.log("1 room inserted to " +usname+ " chatList");
+                        db.close();
+                        if(usname == client.username){
+                          //result verification to client
+                          client.emit('createRoomResult', validResult);
+                        }
+                        
+                    }
+                });                           
+              } else {//find out
+                dbo.collection(dbAccess.chatListCollection).findOneAndUpdate({name:roomID},{$set: {members: roomMembers}} ,function(err, res) {
+                  if (err) throw err;
+                  else{
+                      console.log("1 room updated");
+                      db.close();
+                      
+                      //result verification to client
+                      client.emit('createRoomResult', validResult);
+                      
+                  }
+              });  
+                
+              }
+            }              
+          }); 
+        }
+      });
+
+      
+    }
+  }
+
+  function removefromRoom(roomID, member){
+    var room = getRoomInfo(roomID);   
+    var membersList = room[2].slice();
+        
+    var usernameIndex = membersList.indexOf(member);
+    
+    if(usernameIndex >= 0){
+      //remove room with roomID from chatList of member was removed
+      dbAccess.updateChatList(member, roomID, dbAccess.dellFromChatList);
+ 
+      //remove this member from members
+      membersList.splice(usernameIndex,1);     
+      //update members list of other guys
+      for(var i =0; i < membersList.length; i++){      
+       dbAccess.updateRoomMember(roomID, membersList[i], membersList);
+      }
+ 
+    }
+  }
+  
+  client.on('createRoom', function(roomInfo){
+    
+    const roomID = createroomID();
+    
+    createRoom(roomID,roomInfo);
+  });
+
+  //it main open chat box of a room with id
+ client.on('addGroupMember', function(info){
+  
+   var roomID = info[0];
+   var newMember = info[1];
+  if(roomID.length > maxUsernameLength){
+    var room = getRoomInfo(roomID);
+    var membersList = room[2].slice();
+    membersList.push(newMember);
+
+    var roomInfo = [];
+    roomInfo.push(roomID);
+    roomInfo.push(room[1]);
+    roomInfo.push(membersList);    
+    
+     //add room with roomID to chatList of member was removed
+     dbAccess.insertRoomToChatList(newMember,roomInfo);
+   
+     //update members list of other guys
+     for(var i =0; i < membersList.length - 1; i++){      
+      dbAccess.updateRoomMember(roomID, membersList[i], membersList);
+     }
+
+  }
+ });
+ 
+ client.on("removeGroupMember", function(removeInfo){
+   if(removeInfo){
+     getChatList(client.username);
+    removefromRoom(removeInfo[0], removeInfo[1]);
+   }
+ });
+
+ client.on("changeGroupName", function(newNameInfo){
+   if(newNameInfo){
+     
+     var roomID = newNameInfo[0];
+     var newName = newNameInfo[1];
+     if(roomID.length > maxUsernameLength){
+      var room = getRoomInfo(roomID);
+      var roomMembers = room[2].slice();
+      for( var i = 0; i < roomMembers.length; i++){
+        dbAccess.updateRoomName(roomID, roomMembers[i], newName);
+      }
+     }
+   }
+ });
+
+ 
+//------------------------------------
+ client.on('changeRelationship', function(data){
+   var rlsType = data[0];
+   var friendName = data[1];
+   var socketId = findSocketId(friendName);
+
+   var socketId = findSocketId(friendName);
+   switch(rlsType){
+    case dbAccess.rlsUnfriend: //this case i unfriend afriend
+    //change relationship status of me
+    dbAccess.changeRlsStatus(client.username, friendName, dbAccess.rlsStranger);
+    //change relationship status of friend 
+    dbAccess.changeRlsStatus(friendName, client.username, dbAccess.rlsStranger);
+
+    break;
+    case dbAccess.rlsLock: //this case i lock an user
+    //change relationship status of my chat list 
+    dbAccess.updateChatList(client.username, friendName, dbAccess.rlsLock);
+    //change relationship status of victim 
+    dbAccess.changeRlsStatus(friendName, client.username, dbAccess.rlsStranger);
+
+    break;
+    case dbAccess.rlsUnlock: //this case i unlock and user
+      //change relationship status of sender 
+      dbAccess.updateChatList(client.username, friendName, dbAccess.rlsStranger);
+      
+    break;
+    case dbAccess.addFriendCancel: //this case i cancel request add firend request
+      //change relationship status of getter
+      var promiseResult = dbAccess.changeRlsStatus(client.username, friendName, dbAccess.rlsFriend); 
+        //i change my got request so i delete alert of this one
+        promiseResult.then(function(idResult){
+          
+          dbAccess.updateAlertList(client.username, dbAccess.deleteAlert,idResult);
+        });
+        if(socketId){
+          io.to(socketId).emit("changeRelationshipResult", data);
+        }
+      //change relationship status of sender 
+      dbAccess.changeRlsStatus(friendName, client.username, dbAccess.rlsStranger);
+
+   break;
+     case dbAccess.addFriendReject:
+        //change relationship status of requester in my chat list
+        var promiseResult = dbAccess.changeRlsStatus(client.username, friendName, dbAccess.rlsStranger);
+        //i change my got request so i delete alert of this one
+        promiseResult.then(function(idResult){
+          
+          dbAccess.updateAlertList(client.username, dbAccess.deleteAlert,idResult);
+        });
+        if(socketId){
+          io.to(socketId).emit("changeRelationshipResult", data);
+        }
+        //change relationship status of sender 
+        var promiseResult = dbAccess.changeRlsStatus(friendName, client.username, dbAccess.rlsStranger);
+        
+
+     break;
+     case dbAccess.addFriendAccept:
+        //change relationship status of giver 
+        var promiseResult = dbAccess.changeRlsStatus(client.username, friendName, dbAccess.rlsFriend); 
+        //i change my got request so i delete alert of this one
+        promiseResult.then(function(idResult){
+          
+          dbAccess.updateAlertList(client.username, dbAccess.deleteAlert,idResult);
+        });
+        if(socketId){
+          io.to(socketId).emit("changeRelationshipResult", data);
+        }
+
+        //change relationship status of sender 
+        dbAccess.changeRlsStatus(friendName, client.username, dbAccess.rlsFriend);
+                              
+     break;
+
+     default://getter saw request but do not feedback
+     
+      //change relationship status of giver 
+      var promiseResult = dbAccess.changeRlsStatus(client.username, friendName, dbAccess.rlsAddFriendWait); 
+      promiseResult.then(function(idResult){
+        dbAccess.updateAlertList(client.username, dbAccess.updateAlert,idResult);
+      });
+   }
+ });
+
+ function getAlertList(){
+   var promiseResult = dbAccess.getAlertList(client.username);
+   promiseResult.then(function(alertList){
+     
+     client.emit('getAlertListResult', alertList);
+   })
+ }
+
+ //----------------------------------------------------------------------------
+  
+  client.on('ackUser', function(callTo){
+    const startTime = new dbAccess.dateTimeNow();
+    const startTimeMs = startTime.getTime();
+    let socketId = findSocketId(callTo);
+    if(socketId){
+      console.log(client.username + " ack to: " + callTo);
+      client.to(socketId).emit('ackUserCome', client.username);
+      client.emit('ackUserResult', onlineStatus);
+    }else{
+      console.log(callTo + "do not online");
+      client.emit('ackUserResult', offlineStatus);
+    }
+  });
+  
+  client.on('ackUserFeedBack', function(content){
+    console.log(content);
+    const friendName = content[0];
+    const friendAnswer = content[1];
+
+    const socketId = findSocketId(friendName);
+    if(socketId){
+      client.to(socketId).emit('ackUserFeedbackResult', friendAnswer);
+    }
+  });
+
+  client.on('startCall', function(offerObj){
+    console.log( client.username + " send offer signal to " +offerObj[0]+":   "+ offerObj[1]);
+    let socketId = findSocketId(offerObj[0]);
+
+    client.to(socketId).emit('webrtcOfferCome', offerObj[1]);
+  });
+
+  client.on('webrtcAnswer', function(offerObj){
+    console.log( client.username + " feedback signal answer to "+offerObj[0]+":   " + offerObj[1]);
+    let socketId = findSocketId(offerObj[0]);
+
+    client.to(socketId).emit('webrtcAnswerResult', offerObj[1]);
+  });
+
+  client.on('endTheCall', function(endCallObj){
+    let breakedUser = endCallObj[0];
+    console.log( client.username + " break up with "+breakedUser);
+    let socketId = findSocketId(breakedUser);
+
+    const endTime = new dbAccess.dateTimeNow();
+    const endTimeMs = endTime.getTime();
+    client.to(socketId).emit('endTheCallCome', endCallObj);
+  });
+
+
+
+
+
+
+
+
+
+
+
+
+  //-------------------------------------------------------
+
+   client.on('disconnect', function(){
+     //alert friend you are online
+     alertFriendMyStatus(offlineStatus);
+     delTempImg();
+     deleteSockId(client.username);
+     client.username = null;
+     console.log('a client disconnected');
+     
+   });
+ 
+ 
+ });
+ 
+
