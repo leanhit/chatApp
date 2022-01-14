@@ -1,54 +1,46 @@
-function setupSidebarFrame(){
-    document.getElementById("aSidebarMyName").textContent = socket.username;
-    document.getElementById("imgSidebarMyAvatar").src = getAvatarPathView(socket.username);
-  }
+//const { maxUsernameLength } = require("../server/defineValue");
 
-  function sidebarShowMenu(){
-    document.getElementById("divSidebarMenu").style.display = "block";
-    
-    setTimeout(function(){ 
-      document.getElementById("divSidebarMenu").style.display = "none"; 
-    }, 4000);
-  }
+function setupSidebarFrame() {
+  document.getElementById("aSidebarMyName").textContent = socket.username;
+  document.getElementById("imgSidebarMyAvatar").src = getAvatarPathView(socket.username);
+}
 
-  function sidebarHideMenu(){
+function sidebarShowMenu() {
+  document.getElementById("divSidebarMenu").style.display = "block";
+
+  setTimeout(function () {
     document.getElementById("divSidebarMenu").style.display = "none";
-  }
+  }, 4000);
+}
+
+function sidebarHideMenu() {
+  document.getElementById("divSidebarMenu").style.display = "none";
+}
 
 
-  function logoutClick() {
-        
-    var usernameCookie = "gruu-username";
-    var passwordCookie = "gruu-password-" + loginInfo[0];
+function logoutClick() {
+  deleteCookie("jwtoken");
+  openPage('/');
+}
 
-    setCookie(usernameCookie, "");
-    setCookie(passwordCookie, "" );
-
-  }
-  
-socket.on('getChatListResult', function(data){
-    //clear myChatList
-    myListChat.splice(0, myListChat.length);
-  
-    //copy data to myChatList
-    myListChat = data.slice(0, data.length);
-
-    clearTableChatList();
-    createTableChatlist(myListChat);
-});
-
-socket.on('getRoomsListResult', function(data){
-  //clear myChatList
-  myListRooms.splice(0, myListRooms.length);
-
+socket.on('getChatListResult', function (data) {
   //copy data to myChatList
-  myListRooms = data.slice(0, data.length);
-  
+  myListChat = data;
+
+  setupSidebarFrame();
+  setupStartFrame();
+
+  clearTableChatList();
+  createTableChatlist(myListChat);
 });
 
-function clearTableChatList(){
+socket.on('getRoomsListResult', function (data) {
+  myListRooms=data;
+});
+
+function clearTableChatList() {
   var chatlistView = document.getElementById("ulChatlistView");
-    
+
   chatlistView.innerHTML = "";
 }
 
@@ -57,97 +49,67 @@ var listCellName = [];
 //array store cell of user status
 var listCellStatus = [];
 function createTableChatlist(inputList) {
-  
-    var chatterNumber = inputList.length;
-    var body = document.getElementById('ulChatlistView');
-    var tbl = document.createElement('table');
-    tbl.style.width = '100%';
-    tbl.setAttribute('border', '0');
+  listCellStatus = [];
+  listCellName = [];
+  var chatterNumber = inputList.length;
+  var body = document.getElementById('ulChatlistView');
+  var tbl = addTbl("100%", null);
 
-    var tbdy = document.createElement('tbody');
-    for (var i = 0; i < chatterNumber; i++) {
-      
-      //create row
-      var tr = document.createElement('tr');
-      const aChatter = inputList[i].slice();
-      const usname = aChatter[0]; 
+  var tbdy = document.createElement('tbody');
+  for (var i = 0; i < chatterNumber; i++) {
+    //create row
+    var tr = document.createElement('tr');
+    const aChatter = inputList[i];
 
-      //create status cell      ---------------------------------------  
-      var td = document.createElement('td');
-      //create status icon         
-      var img = document.createElement('img');    
-      var avaPath = getStatusIcon(aChatter[1]);    
-      img.src= avaPath ;
-      img.alt = avaPath;
-      img.width = "15";
-      td.appendChild(img);
-      td.width = '15';
-      //add cell to row
-      tr.appendChild(td); 
-      listCellStatus.push(img);  
-              
-      //create avatar cell -------------------------------------------------
-      var td = document.createElement('td');
+    //create status cell      ---------------------------------------  
+    addImgCell(tr, aChatter.userStatus, sizeImgStatus);
 
-      var img = document.createElement('img');
-      var avaPath = getAvatarPathView(aChatter[0]);
-      img.src= avaPath ;
-      // img.alt = avaPath;
-      img.width = "30";
-      img.height = "30";
-      td.appendChild(img);
-      td.width = '30';
-      //add cell to row
-      tr.appendChild(td); 
+    //create avatar cell -------------------------------------------------
+    addImgCell(tr, aChatter.nameID, sizeImgAvatar);
 
-      //create username cell ---------------------------------------------
-      var td = document.createElement('td');
-      //td.style.width = "500px";              
-      td.appendChild(document.createTextNode(usname)); 
-      //catch event click user name in list
-      td.addEventListener('click', clickUsername);
-      //reflection to outside function
-      function clickUsername() {
-        
-        reflectFunction(usname);
-      } 
+    //create username cell ---------------------------------------------
+    var tdUser = document.createElement('td');
+    tdUser.appendChild(document.createTextNode(aChatter.realName));
 
-      //add cell to row  ---------------------------------------------
-      tr.appendChild(td);
-      listCellName.push(td);      
-      tbdy.appendChild(tr);
-    }
-    tbl.appendChild(tbdy);
-    body.appendChild(tbl);
-    $('#ulChatlistView').animate({scrollTop: $('#ulChatlistView').prop("scrollHeight")}, 500);
+    listCellName.push(tdUser);
+    reflectFunction(tdUser, aChatter.nameID);
+    //add cell to row  
+    tr.appendChild(tdUser);
+    //add tr to tbdy
+    tbdy.appendChild(tr);
+  }
+  tbl.appendChild(tbdy);
+  body.appendChild(tbl);
+  $('#ulChatlistView').animate({ scrollTop: $('#ulChatlistView').prop("scrollHeight") }, 500);
 
 }
 
 //change color of cell selected and call selectUser() function
-function reflectFunction(usname){  
+function reflectFunction(tdName, userID) {
   //set numberOfMessagePage = 0 to count number of message page to read more
   numberOfMessagePage = 1;
-  for(var i = 0; i < myListChat.length; i++){
-    if(listCellName[i].textContent == usname){
-     selectUser(usname);
-      listCellName[i].style.backgroundColor = '#3807';
-    }else{
-      listCellName[i].style.backgroundColor = "paleturquoise";
-    }
-  }
 
+  tdName.addEventListener('click', clickEle);
+  function clickEle() {
+    listCellName.forEach(td => {
+      td.style.backgroundColor = 'paleturquoise';
+    });
+
+    tdName.style.backgroundColor = '#3807';
+    selectUser(userID);
+  }
 }
 
 
-socket.on('friendStatusResult', function(data){  
+socket.on('friendStatusResult', function (data) {
   var friendName = data[0];
   var friendStatus = data[1];
 
-  if(listCellStatus.length){
-    for(var i = 0; i < listCellStatus.length; i++){
-      if(listCellName[i].textContent == friendName){
+  if (listCellStatus.length) {
+    for (var i = 0; i < listCellStatus.length; i++) {
+      if (listCellName[i].textContent == friendName) {
         //reset status icon of friend
-        
+
         listCellStatus[i].src = getStatusIcon(friendStatus);
       }
     }
@@ -155,16 +117,16 @@ socket.on('friendStatusResult', function(data){
   }
 
   var singleAlert = '';
-  if(friendStatus === offlineStatus){
+  if (friendStatus === offlineStatus) {
     singleAlert = friendName + " is offline";
 
     //friend off while calling you
-    if((friendName === boxChatOf || friendName === currentCaller) && isCalling){
+    if ((friendName === boxChatOf || friendName === currentCaller) && isCalling) {
       hideMediaConferent();
       stopBothVideoAndAudio(localStrem);
       singleCallReset();
     }
-  }else{
+  } else {
     singleAlert = friendName + " is online";
   }
 
@@ -172,140 +134,104 @@ socket.on('friendStatusResult', function(data){
   singleAlertType = alertFriendStatus;
   showSingleAlert(singleAlert);
 
-  
+
 });
 
 //-----------------------------------------------------------------------
 
 
 function showFriendToChoice() {
-    var chatterNumber = myListChat.length;
-    var body = document.getElementById('ulChoiceFriend');
-    var tbl = document.createElement('table');
-    tbl.style.width = '100%';
-    tbl.setAttribute('border', '0');
+  var body = document.getElementById('ulChoiceFriend');
+  var tbl = addTbl();
 
-    var tbdy = document.createElement('tbody');
-    for (var i = 0; i < chatterNumber; i++) {
-        //create row
-        var tr = document.createElement('tr');
-        const aChatter = myListChat[i].slice();
-        const usname = aChatter[0]; 
-        
-      if(usname.length <= 20 && usname != "chatbot"){
-        //create status cell      ---------------------------------------  
-        var td = document.createElement('td');
-        //create status icon         
-        var checkbox = document.createElement('input');    
-        checkbox.setAttribute("type", "checkbox");
-        checkbox.setAttribute("name", "choicer");
-        checkbox.setAttribute("value", usname);
-        
-        
-        td.appendChild(checkbox);
-        td.width = '5';
-        //add cell to row
-        tr.appendChild(td); 
-                
-        //create avatar cell -------------------------------------------------
-        var td = document.createElement('td');
+  var tbdy = document.createElement('tbody');
+  myListChat.forEach(aChatter => {
+    //create row
+    var tr = document.createElement('tr');
+    const usname = aChatter.nameID;
 
-        var img = document.createElement('img');
-        var avaPath = getAvatarPathView(usname);
-        img.src= avaPath ;
-        // img.alt = avaPath;
-        img.width = "30";
-        img.height = "30";
-        td.appendChild(img);
-        td.width = '30';
-        //add cell to row
-        tr.appendChild(td); 
+    if (usname.length <= maxUsernameLength && usname != "chatbot") {
+      //create status cell      ---------------------------------------  
+      addCbCell(tr, "choicer", usname);
 
-        //create username cell ---------------------------------------------
-        var td = document.createElement('td');
-        //td.style.width = "500px";              
-        td.appendChild(document.createTextNode(usname)); 
-        
-        //add cell to row  ---------------------------------------------
-        tr.appendChild(td);
-        tbdy.appendChild(tr);
-      }
+      //create avatar cell -------------------------------------------------
+      addImgCell(tr, usname, sizeImgAvatar);
+
+      //create username cell ---------------------------------------------
+      addTextCell(tr, usname, sizeFontChat);
+
+      tbdy.appendChild(tr);
     }
-    tbl.appendChild(tbdy);
-    body.appendChild(tbl);
-    $('#ulChoiceFriend').animate({scrollTop: $('#ulChoiceFriend').prop("scrollHeight")}, 500);
+  });
+  tbl.appendChild(tbdy);
+  body.appendChild(tbl);
+  $('#ulChoiceFriend').animate({ scrollTop: $('#ulChoiceFriend').prop("scrollHeight") }, 500);
 }
 
-function createNewChat(){
-  
+function createNewChat() {
+
   document.getElementById("ulChoiceFriend").innerHTML = "";
   showFriendToChoice();
-  
+
   document.getElementById("divCreateNewGroup").style.display = "block";
 }
 
-function CloseCreateNewGroup(){
+function CloseCreateNewGroup() {
   document.getElementById("divCreateNewGroup").style.display = "none";
 }
 
-function createNewGroup(){
-  var groupInfo = [];
-  var groupMembers = [];
+function createNewGroup() {
+  var roomMembers = [];
 
   const groupName = document.getElementById("inputGroupName");
-  if(groupName.value == null){
-    groupInfo.push("Group chat");
-  }
-  else {
-    groupInfo.push(groupName.value);
-  }
 
   //add member
   var checkboxList = document.getElementsByName('choicer');
-  groupMembers.push(socket.username);
-  
-  for(var i = 0; i < checkboxList.length; i++){
-    
-    if(checkboxList[i].checked == true){
-      groupMembers.push(checkboxList[i].value);
+  roomMembers.push(socket.username);
+
+  checkboxList.forEach(cb => {
+    if (cb.checked == true) {
+      roomMembers.push(cb.value);
     }
-  }
+  });
 
-  if(groupMembers.length >= 3){
-    
-    groupInfo.push(groupMembers);
+  if (roomMembers.length >= 3) {
+    socket.emit("createRoom", {
+      roomName: groupName.value,
+      roomMembers: roomMembers
+    });
 
-    socket.emit("createRoom", groupInfo);
-    socket.on("createRoomResult", function(data){
-      if(data){
-        socket.emit("getChatList", data);
-        document.getElementById("divCreateNewGroup").style.display = "none";
-      }
-    })
-  }else{
+  } else {
     alert('Please choice more people');
   }
 }
+
+socket.on("createRoomResult", function (data) {
+  if (data) {
+    refreshData();
+    document.getElementById("divCreateNewGroup").style.display = "none";
+  }
+});
 //-------------------------------------------------------------------------
 
 //funcrtion process user find some thing in list chatter on sidebar
-function enterCharPress(event){
-  
+function enterCharPress(event) {
+
   var inputChar = document.getElementById("inSidebarFind");
   var findWhom = inputChar.value;
-  
+
   var newChatList = [];
-  
-  if(findWhom.length){//search box has value
-    for(var i=0; i < myListChat.length; i++){
+
+  if (findWhom.length) {//search box has value
+    for (var i = 0; i < myListChat.length; i++) {
       var currentNickname = myListChat[i];
-      if(currentNickname[0].indexOf(findWhom) > -1){
+      if (currentNickname[0].indexOf(findWhom) > -1) {
         newChatList.push(currentNickname);
-      };      
+      };
     }
     clearTableChatList();
     createTableChatlist(newChatList);
-  }else{  //serach box was clear  
+  } else {  //serach box was clear  
     clearTableChatList();
     createTableChatlist(myListChat);
   }
@@ -314,83 +240,85 @@ function enterCharPress(event){
 //----------------------------------------------------------------------
 var numberOfMessagePage = 1;
 
-function readMoreMess(){
+function readMoreMess() {
   numberOfMessagePage++;
-  var readMoreMessInfo = [];
-  readMoreMessInfo.push(boxChatOf);
-  readMoreMessInfo.push(numberOfMessagePage);
+  var readMoreMessInfo = {
+    friendName: boxChatOf,
+    count: numberOfMessagePage
+  };
   socket.emit('readMoreMess', readMoreMessInfo);
-  
-  
+
+
 }
 
-socket.on('readMoreMessResult', function (result){
-  if (result ) {
+socket.on('readMoreMessResult', function (result) {
+  if (result) {
     clearChatBox();
-    if (result.length > 0){
-      for( var k = result.length - 1; k >= 0 ; k--){
+    if (result.length > 0) {
+      for (var k = result.length - 1; k >= 0; k--) {
         var mess = [];
         mess = result[k].slice();
-        
+
         addaMessToWindow(mess, 1);
       }
     }
-    
+
   } else {
-    
+
   }
 });
-  
+
 
 
 /* ------------------- code for alert ------------------ */
 //single alert. an alert respond and action
-function showAlert(){
+function showAlert() {
   alert("alert");
 }
 
 
-function sidebarOpenAlert(){  
-  if(singleAlertType === alertFriendCall){
+function sidebarOpenAlert() {
+  if (singleAlertType === alertFriendCall) {
     showMediaConferent();
 
     hideLocalVideo();
-    
+
     showRemoteVideoControl();
-    showCallFeedbackControl();    
+    showCallFeedbackControl();
     hideRemoteVideo();
-    
-  }else{
-    socket.emit("getChatList", "1");
-    socket.on('getChatListResult', function(data){
-      reflectFunction(friendInAlert);
+
+  } else {
+    refreshData();
+    socket.on('getChatListResult', () => {
+      //reflectFunction(listCellName[0],friendInAlert);
+      selectUser(friendInAlert);
     });
   }
-  
+
 }
 
-function showSingleAlert(comeAlert){
-  
+function showSingleAlert(comeAlert) {
+
   //insert alert content
   document.getElementById("aSidebarSingleAlert").textContent = comeAlert;
   //display it
   document.getElementById("divSidebarSingleAlert").style.display = "block";
 
   //hide alert after few sec
-  setTimeout(function(){ 
+  setTimeout(function () {
     document.getElementById("divSidebarSingleAlert").style.display = "none";
-    document.getElementById("aSidebarSingleAlert").textContent = ""; 
+    document.getElementById("aSidebarSingleAlert").textContent = "";
     //clear global value
     singleAlertType = 0;
     friendInAlert = "";
-  }, 9000); 
+  }, 9000);
 }
 
 
-socket.on("addFriendRequestAlert", function(friendRequest){
-  
+socket.on("addFriendRequestAlert", function (friendRequest) {
+
   //friendInAlert is global value
-  friendInAlert= friendRequest;
+  friendInAlert = friendRequest;
   var alert = friendInAlert + actContent[1];
 
   singleAlertType = alertAddFriendRequest;
