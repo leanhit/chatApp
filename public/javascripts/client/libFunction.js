@@ -44,6 +44,13 @@ const alertFriendMessage = 3;
 const alertGroupMessage = 4;
 const alertFriendCall = 5;
 const alertGroupCall = 6;
+const actContent = [
+  'sent add friend request',
+  'sent a message to you',
+  'sent s message to group ',
+  'call to you ',
+  'call to group '
+]
 //<-------------
 
 //define actions in alert

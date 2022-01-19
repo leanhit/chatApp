@@ -20,7 +20,7 @@
     "mssql": "^7.1.1",
     "nodemon": "^2.0.14",
     "simple-peer": "^9.11.0",
-    "socket.io": "^4.0.1"
+    "socket.io": "^4.4.1"
   },
   "description": "chat realtime application",
   "main": "app.js",

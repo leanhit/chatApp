@@ -359,7 +359,7 @@ function sendMessageNow(usname) {
 
 socket.on('getAlertListResult', function (data) {
 
-  myAlertList = data.splice(0, data.length);
+  myAlertList = data;
   var alertArena = document.getElementById("ulAlertShow");
   showAlertsList(alertArena, myAlertList);
 
@@ -373,16 +373,18 @@ function showAlertsList(body, inputList) {
 
     var tbdy = document.createElement('tbody');
 
-    for (var i = 0; i < inputList.length; i++) {
-      //create row
+    inputList.forEach(anAlert => {
+      const actUser = anAlert.actionUser;
+      const actType = anAlert.actionType;
+      const actTime = anAlert.created;
+          //id,
+      //contentID
+      
       var trContent = document.createElement('tr');
-      const anAlert = inputList[i].slice();
-      const actUser = anAlert[0];
-      const actType = anAlert[1];
-      const actTime = anAlert[2];
+      
 
       //create avatar cell -------------------------------------------------
-      addImgCell(tr, actUser, sizeImgAvatar);
+      addImgCell(trContent, actUser, sizeImgAvatar);
 
       //create action detail cell ---------------------------------------------
       var td = document.createElement('td');
@@ -423,7 +425,7 @@ function showAlertsList(body, inputList) {
 
       tbdy.appendChild(trContent);
       tbdy.appendChild(trTime);
-    }
+    });
     tbl.appendChild(tbdy);
     body.appendChild(tbl);
   } else {

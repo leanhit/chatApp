@@ -30,7 +30,27 @@ const roomsCounterCollection = "roomscounter";
 const refreshTokenCollection = 'refreshToken';
 
 
+function checkValidUsername(username) {
+    let isUsnameOk;
+    if (username?.length >= minUsernameLength && username?.length <= maxUsernameLength) {
+        for (var i = 0; i < username.length; i++) {
+            let aChar = username[i].slice();
+            if (validChar.indexOf(aChar) > -1){
+                //do nothing
+            } else {
+                return isUsnameOk = false;
+            }
+        }
+         isUsnameOk = true;
+    } else {
+         isUsnameOk = false;
+    }
+    return isUsnameOk;
+}
+
 module.exports = {
+    checkValidUsername:checkValidUsername,
+    
     minUsernameLength: minUsernameLength,
     maxUsernameLength: maxUsernameLength,
     validChar: validChar,

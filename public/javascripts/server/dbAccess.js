@@ -1,9 +1,5 @@
-var bcrypt = require('bcrypt');
 var MongoClient = require('mongodb').MongoClient;
-//const images = require('/images');
-
-
-
+var defineVal = require('./defineValue');
 
 function addZero(number) {
     if (0 <= number && number <= 9) {
@@ -49,151 +45,6 @@ function checkAccsessDB(sender, giver) {
     } else {
         return false;
     }
-}
-
-//active with db function
-function saveMessTxtRoom(username, collectionName, mess, sender) {
-    MongoClient.connect(defineVal.baseUrl, function (err, db) {
-        if (err) {
-            throw err;
-        }
-        else {
-            var dbo = db.db(defineVal.dbUser + username);
-            var newMess = {
-                sender: sender,
-                textMess: mess,
-                created: dateTimeNow()
-            };
-            dbo.collection(collectionName).insertOne(newMess, function (err, res) {
-                if (err) throw err;
-                else {
-                    console.log("1 document inserted to room: " + username + "//" + collectionName);
-                    db.close();
-                }
-            });
-
-        }
-    });
-}
-
-function saveMessImageBase64Room(username, collectionName, mess, sender) {
-    MongoClient.connect(defineVal.baseUrl, function (err, db) {
-        if (err) {
-            throw err;
-        }
-        else {
-            var dbo = db.db(defineVal.dbUser + username);
-            var newMess = {
-                sender: sender,
-                imgBase64: mess,
-                created: dateTimeNow()
-            };
-            dbo.collection(collectionName).insertOne(newMess, function (err, res) {
-                if (err) throw err;
-                else {
-                    console.log("1 document inserted");
-                    db.close();
-                }
-            });
-
-        }
-    });
-}
-
-function saveMessTxtSender(username, collectionName, mess) {
-    MongoClient.connect(defineVal.baseUrl, function (err, db) {
-        if (err) {
-            throw err;
-        }
-        else {
-            var dbo = db.db(defineVal.dbUser + username);
-            var newMess = {
-                sender: username,
-                textMess: mess,
-                created: dateTimeNow()
-            };
-            dbo.collection(collectionName).insertOne(newMess, function (err, res) {
-                if (err) throw err;
-                else {
-                    console.log("1 message was saved in db of " + username);
-                    db.close();
-                }
-            });
-
-        }
-    });
-}
-
-function saveMessTxtGiver(username, collectionName, mess) {
-    MongoClient.connect(defineVal.baseUrl, function (err, db) {
-        if (err) {
-            throw err;
-        }
-        else {
-            var dbo = db.db(defineVal.dbUser + username);
-            var newMess = {
-                sender: collectionName,
-                textMess: mess,
-                created: dateTimeNow()
-            };
-            dbo.collection(collectionName).insertOne(newMess, function (err, res) {
-                if (err) throw err;
-                else {
-                    console.log("1 message was saved in db of " + username);
-                    db.close();
-                }
-            });
-
-        }
-    });
-}
-
-function saveMessImageBase64Sender(username, collectionName, mess) {
-    MongoClient.connect(defineVal.baseUrl, function (err, db) {
-        if (err) {
-            throw err;
-        }
-        else {
-            var dbo = db.db(defineVal.dbUser + username);
-            var newMess = {
-                sender: username,
-                imgBase64: mess,
-                created: dateTimeNow()
-            };
-            dbo.collection(collectionName).insertOne(newMess, function (err, res) {
-                if (err) throw err;
-                else {
-                    console.log("1 img message was saved in db of " + username);
-                    db.close();
-                }
-            });
-
-        }
-    });
-}
-
-function saveMessImageBase64Giver(username, collectionName, mess) {
-    MongoClient.connect(defineVal.baseUrl, function (err, db) {
-        if (err) {
-            throw err;
-        }
-        else {
-            var dbo = db.db(defineVal.dbUser + username);
-            var newMess = {
-                sender: collectionName,
-                imgBase64: mess,
-                created: dateTimeNow()
-            };
-            dbo.collection(collectionName).insertOne(newMess, function (err, res) {
-                if (err) throw err;
-                else {
-                    console.log("1 img message was saved in db of " + username);
-                    db.close();
-                }
-            });
-
-        }
-    });
 }
 
 function createdDefaultUserDB(usName) {
@@ -353,68 +204,7 @@ function updateChatList(usname, chatter, addOrDel) {
         }
     });
 }
-//----------------------------------------------
-function updateRoomMember(roomID, member, membersList) {
-    var dbName = defineVal.dbUser + member;
-    MongoClient.connect(defineVal.baseUrl,  function (err, db) {
-        var dbo = db.db(dbName);
 
-        dbo.collection(defineVal.chatListCollection).findOneAndUpdate({ nameID: roomID }, { $set: { members: membersList } }, function (err, res) {
-            if (err) throw err;
-            else {
-                console.log("room " + roomID + " of " + member + " updated");
-                db.close();
-            }
-        });
-    });
-}
-
-
-function insertRoomToChatList(usname, roomInfo) {
-    var roomID = roomInfo.roomID;
-    var roomName = roomInfo.roomName;
-    var roomMembers = roomInfo.members;
-
-    MongoClient.connect(defineVal.baseUrl, function (err, db) {
-        if (err) {
-            throw err;
-        } else {
-            const dbName = defineVal.dbUser + usname;
-            var dbo = db.db(dbName);
-
-            //add room to chat list         
-            var newChater = {
-                nameID: roomID,
-                roomName: roomName,
-                members: roomMembers,
-                lastChat: dateTimeNow(),
-                created: dateTimeNow()
-            };
-            dbo.collection(defineVal.chatListCollection).insertOne(newChater, function (err, res) {
-                if (err) throw err;
-                else {
-                    console.log("1 room inserted to " + usname + " chatList");
-                    db.close();
-                }
-            });
-        }
-    });
-}
-
-function updateRoomName(roomID, member, newRoomName) {
-    var dbName = defineVal.dbUser + member;
-    MongoClient.connect(defineVal.baseUrl,  function (err, db) {
-        var dbo = db.db(dbName);
-
-        dbo.collection(defineVal.chatListCollection).findOneAndUpdate({ nameID: roomID }, { $set: { roomName: newRoomName } }, function (err, res) {
-            if (err) throw err;
-            else {
-                console.log("room " + roomID + " of " + member + " updated");
-                db.close();
-            }
-        });
-    });
-}
 
 //------------------------------------------------------------
 
@@ -604,13 +394,13 @@ function getAlertList(username) {
                         } else {
                             data.forEach(function (anAlert) {
                                 //setup myChatList
-                                var tempAlert = [];
-                                tempAlert.push(anAlert.actionUser);
-                                tempAlert.push(anAlert.actionType);
-                                tempAlert.push(anAlert.created);
-                                tempAlert.push(anAlert._id);
-                                tempAlert.push(anAlert.contentID);
-
+                                var tempAlert = {
+                                    actionUser: anAlert.actionUser,
+                                    actionType: anAlert.actionType,
+                                    created: anAlert.created,
+                                    id: anAlert._id,
+                                    contentID: anAlert.contentID
+                                }
                                 myAlertList.push(tempAlert);
                             });
                         }
@@ -681,7 +471,7 @@ function checkExitsUser(myNickname, userNickname) {
 
 
 //--------------------------------
-var defineVal = require('./defineValue');
+
 function checkValidUsername(username) {
     if (username?.length >= defineVal.minUsernameLength && username?.length <= defineVal.maxUsernameLength) {
         for (var i = 0; i < username.length; i++) {
@@ -711,15 +501,6 @@ module.exports = {
 
 
     //-------------------------------------------------------------
-    updateRoomName: updateRoomName,
-    insertRoomToChatList: insertRoomToChatList,
-    updateRoomMember: updateRoomMember,
-    saveMessTxtRoom: saveMessTxtRoom,
-    saveMessImageBase64Room: saveMessImageBase64Room,
-    saveMessTxtSender: saveMessTxtSender,
-    saveMessTxtGiver: saveMessTxtGiver,
-    saveMessImageBase64Giver: saveMessImageBase64Giver,
-    saveMessImageBase64Sender: saveMessImageBase64Sender,
     UpdateImgCollection: UpdateImgCollection,
     updateInfomation: updateInfomation,
     updateChatList: updateChatList,

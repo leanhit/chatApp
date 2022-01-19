@@ -213,17 +213,16 @@ function addImg(imgID, imgSize) {
     return img;
 }
 
-function addImage(imgSrc, imgWidth, imgHight) {
+function addImage(imgSrc, imgWidth) {
     var img = document.createElement('img');
     img.src = imgSrc;
     img.width = imgWidth;
-    if (imgHight !== null)
-        img.height = imgHight;
+    
     return img;
 }
 
 function addImgCell(tr, imgID, imgSize) {
-    console.log(imgID)
+    //console.log(imgID)
     var td = document.createElement('td');
     var img = document.createElement('img');
     if (imgSize === sizeImgAvatar || imgSize === sizeAvatarChat) {
@@ -233,7 +232,7 @@ function addImgCell(tr, imgID, imgSize) {
         img.src = getStatusIcon(imgID);
         img.height = imgSize;
         listCellStatus.push(td);
-    } else
+    } else if(imgSize === sizeImgChat)
         img.src = imgID;
 
     img.width = imgSize;

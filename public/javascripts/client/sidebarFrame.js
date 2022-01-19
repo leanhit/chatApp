@@ -35,7 +35,7 @@ socket.on('getChatListResult', function (data) {
 });
 
 socket.on('getRoomsListResult', function (data) {
-  myListRooms=data;
+  myListRooms = data;
 });
 
 function clearTableChatList() {
@@ -200,18 +200,20 @@ function createNewGroup() {
       roomName: groupName.value,
       roomMembers: roomMembers
     });
-
+    createRoomResult();
   } else {
     alert('Please choice more people');
   }
 }
 
-socket.on("createRoomResult", function (data) {
-  if (data) {
+function createRoomResult() {
+  document.getElementById("btnCreateNewGroup").style.display = "none";
+  setTimeout(() => {
     refreshData();
     document.getElementById("divCreateNewGroup").style.display = "none";
-  }
-});
+  }, 2000);
+
+}
 //-------------------------------------------------------------------------
 
 //funcrtion process user find some thing in list chatter on sidebar

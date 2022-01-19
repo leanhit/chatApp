@@ -140,13 +140,10 @@ function addMessage(body, mess, side) {
         } else if (i == 0 && j == 0) {//content cell
           //give pic
           if (mess.messType) {
-            var arrayImg = mess.messContent;
-
-            for (var h = 0; h < arrayImg.length; h++) {
-              let tdAvatar = addImgCell(tr, imgPath + arrayImg[h], sizeAvatarChat);
-              tdAvatar.style.float = side;
-
-            }
+            mess.messContent.forEach(imgUrl=>{
+              let tdImg = addImgCell(tr, imgPath + imgUrl, sizeImgChat);
+              tdImg.style.float = side;
+            });
           } else {//text
             var tdText = addTextCell(tr, mess.messContent, sizeFontChat);
             tdText.style.float = side;
@@ -173,13 +170,10 @@ function addMessage(body, mess, side) {
         } else if (i == 0 && j == 1) {//content cell
           //give pic
           if (mess.messType) {
-            var arrayImg = mess.messContent;
-
-            for (var h = 0; h < arrayImg.length; h++) {
-              let tdAvatar = addImgCell(tr, imgPath + arrayImg[h], sizeAvatarChat);
-              tdAvatar.style.float = side;
-
-            }
+            mess.messContent.forEach(imgUrl=>{
+              let tdImg = addImgCell(tr, imgPath + imgUrl, sizeImgChat);
+              tdImg.style.float = side;
+            });
           } else {//text
             var tdText = addTextCell(tr, mess.messContent, sizeFontChat);
             //tdText.style.float = side;
